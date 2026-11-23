@@ -13,39 +13,40 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Java 17
-        uses: actions/setup-java@v4
+      - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
-      - name: Android SDK
-        uses: android-actions/setup-android@v3
+      - uses: android-actions/setup-android@v3
 
-      - name: Install SDK
-        run: |
-          sdkmanager "platforms;android-35" "build-tools;35.0.0"
+      - name: Install Android SDK
+        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
 
-      - name: Gradle
-        uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
 
-      - name: Build with full logs
+      - name: Build APK
+        id: build
+        continue-on-error: true
         run: |
-          gradle --no-daemon clean assembleDebug --stacktrace --info 2>&1 | tee build.log
-          test ${PIPESTATUS[0]} -eq 0
+          gradle --no-daemon clean assembleDebug --stacktrace > build.log 2>&1
+          echo "BUILD_EXIT=$?" >> "$GITHUB_OUTPUT"
+          cat build.log
 
-      - name: Upload build log
+      - name: Upload complete log
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: KYOJI-build-log
+          name: KYOJI-error-report
           path: build.log
-          if-no-files-found: warn
+
+      - name: Fail if build failed
+        if: steps.build.outputs.BUILD_EXIT != '0'
+        run: exit 1
 
       - name: Upload APK
         if: success()
